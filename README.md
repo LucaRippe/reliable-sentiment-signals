@@ -31,7 +31,7 @@ The default pipeline uses **only free data sources and tools** — no paid API s
 
 | Layer | Provider | Notes |
 | --- | --- | --- |
-| **Universe** | [index-constitution](https://github.com/unliftedq/index-constitution) | Point-in-time S&P 500 membership (`constituents_at("sp500", date)`). Free Wikipedia-based alternatives: [fja05680/sp500](https://github.com/fja05680/sp500), [bkestelman/sp500_historical_components](https://github.com/bkestelman/sp500_historical_components). |
+| **Universe** | [index-constitution CSV](https://github.com/unliftedq/index-constitution) | Point-in-time S&P 500 membership from `history/sp500.csv` (cached locally). Wikipedia-based alternatives: [fja05680/sp500](https://github.com/fja05680/sp500). |
 | **Transcripts** | [Hugging Face `kurry/sp500_earnings_transcripts`](https://huggingface.co/datasets/kurry/sp500_earnings_transcripts) | ~33k S&P 500 earnings calls (2005–2025), full text + speaker-segmented dialogues. Research/educational license. |
 | **Prices** | [`yfinance`](https://github.com/ranaroussi/yfinance) | Adjusted OHLCV, earnings dates. Delisted tickers may be missing — survivorship bias must be documented. |
 | **Fundamentals** | [SimFin](https://simfin.com/) (primary) + `yfinance` (fallback) | Market cap, book equity → book-to-market. SimFin requires free registration (`SIMFIN_API_KEY` in `.env`). |
@@ -110,7 +110,27 @@ All analysis and visualization dependencies are open source (see `pyproject.toml
 
 
 
-## 4. Repository structure
+## 4. Quick start — build the dataset
+
+```bash
+conda activate scs
+pip install -e ".[data]"
+
+# Smoke test: transcripts only (fast)
+python scripts/01_build_master_panel.py --transcripts-only --limit 50
+
+# Full panel (slow: yfinance downloads per symbol)
+python scripts/01_build_master_panel.py --skip-controls
+python scripts/01_build_master_panel.py
+```
+
+Output: `data/processed/master_panel.parquet`
+
+---
+
+
+
+## 5. Repository structure
 
 ```text
 sentiment-certainty-signals/

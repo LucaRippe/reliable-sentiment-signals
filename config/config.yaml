@@ -13,12 +13,10 @@ project:
 data:
   universe:
     # Point-in-time S&P 500 membership to reduce survivorship bias.
-    provider: index-constitution
-    repo: https://github.com/unliftedq/index-constitution
-    # Alternatives (also free, Wikipedia-based CSV):
-    #   - https://github.com/fja05680/sp500
-    #   - https://github.com/bkestelman/sp500_historical_components
+    provider: index-constitution-csv
     index: sp500
+    url: https://raw.githubusercontent.com/unliftedq/index-constitution/main/history/sp500.csv
+    cache: data/raw/sp500_history.csv
 
   transcripts:
     provider: huggingface
@@ -96,6 +94,9 @@ nlp:
   monte_carlo:
     n_samples: 20
     temperature: 0.7
+    max_new_tokens_answer_only: 5       # answer_only: single letter → very short
+    max_new_tokens_explanation: 200     # generate_explanation: JSON with rationale
+    checkpoint_every: 100               # save checkpoint every N rows
   uncertainty_metrics:
     - confidence
     - mean_entropy
