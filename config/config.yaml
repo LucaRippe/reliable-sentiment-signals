@@ -1,0 +1,158 @@
+# Sentiment-Certainty Signals — default configuration
+# Free-data stack: no paid API keys required for the core pipeline.
+# Optional: SIMFIN_API_KEY in .env for fundamentals (free registration at simfin.com).
+
+project:
+  name: sentiment-certainty-signals
+  universe: sp500
+  lookback_years: 5
+
+# ---------------------------------------------------------------------------
+# Data sources (100 % free stack)
+# ---------------------------------------------------------------------------
+data:
+  universe:
+    # Point-in-time S&P 500 membership to reduce survivorship bias.
+    provider: index-constitution
+    repo: https://github.com/unliftedq/index-constitution
+    # Alternatives (also free, Wikipedia-based CSV):
+    #   - https://github.com/fja05680/sp500
+    #   - https://github.com/bkestelman/sp500_historical_components
+    index: sp500
+
+  transcripts:
+    provider: huggingface
+    dataset: kurry/sp500_earnings_transcripts
+    url: https://huggingface.co/datasets/kurry/sp500_earnings_transcripts
+    # Fields used: symbol, date, content, dialogues (speaker-segmented)
+    license: research and educational use
+    # Not used (paid / limited free tier): Financial Modeling Prep, EarningsAPI, Statwonk
+
+  prices:
+    provider: yfinance
+    package: yfinance
+    fields:
+      - adj_close
+      - volume
+    # Limitation: delisted / renamed tickers may be missing → document survivorship bias.
+
+  fundamentals:
+    primary: simfin
+    simfin:
+      url: https://simfin.com/
+      api_key_env: SIMFIN_API_KEY  # free registration; optional for MVP (yfinance fallback)
+    fallback: yfinance
+    fields:
+      - market_cap
+      - book_equity  # for book-to-market
+
+  sue:
+    # Standardized unexpected earnings — computed in-pipeline.
+    method: lagged_eps  # actual EPS vs. same-quarter prior year (fully free)
+    # Alternative (partial coverage, free): yfinance earnings surprise when available
+    fallback: yfinance_earnings_surprise
+
+  factors:
+    provider: ken_french
+    library_url: https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html
+    downloads:
+      ff5_daily: https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_5_Factors_2x3_daily_CSV.zip
+      momentum_daily: https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Momentum_Factor_daily_CSV.zip
+    controls:
+      - momentum_12_1
+      - size
+      - value
+      - sue
+      - announcement_return
+
+  paths:
+    raw: data/raw
+    interim: data/interim
+    processed: data/processed
+
+# ---------------------------------------------------------------------------
+# Look-ahead safety
+# ---------------------------------------------------------------------------
+timing:
+  signal_available: transcript_public_timestamp
+  entry: t_plus_1
+  holding_period_days: [1, 2, 3, 4, 5]
+  primary_horizon: 5  # t+1 .. t+5 trading days (post-earnings drift)
+
+# ---------------------------------------------------------------------------
+# NLP — local LLM (no inference API costs)
+# ---------------------------------------------------------------------------
+nlp:
+  backend: huggingface  # alternatives: ollama
+  model: Qwen/Qwen2.5-7B-Instruct
+  # Other free instruct models: meta-llama/Llama-3.1-8B-Instruct, mistralai/Mistral-7B-Instruct-v0.3
+  sentiment_classes:
+    - bearish
+    - neutral
+    - bullish
+  sections:
+    - prepared_remarks
+    - qa
+  monte_carlo:
+    n_samples: 20
+    temperature: 0.7
+  uncertainty_metrics:
+    - confidence
+    - mean_entropy
+    - agreement
+  reasoning:
+    enabled: true  # zero-shot chain-of-thought before verdict (calibration experiment)
+
+# ---------------------------------------------------------------------------
+# Calibration
+# ---------------------------------------------------------------------------
+calibration:
+  metrics:
+    - aurc
+    - ece
+  selective_prediction: true
+  active_learning:
+    enabled: true
+    rounds: 3
+
+# ---------------------------------------------------------------------------
+# Signals & backtest
+# ---------------------------------------------------------------------------
+signals:
+  standardize: cross_sectional_per_window
+  orthogonalize_controls: true
+  regressions:
+    - panel
+    - fama_macbeth
+
+backtest:
+  strategy: long_short_sentiment
+  uncertainty_modes:
+    - base
+    - filter
+    - sizing
+  transaction_cost_bps: 10
+  metrics:
+    - cumulative_return
+    - sharpe
+    - max_drawdown
+    - hit_rate
+    - turnover
+    - factor_alpha
+
+# ---------------------------------------------------------------------------
+# Dashboard
+# ---------------------------------------------------------------------------
+dashboard:
+  provider: streamlit
+  # Local: streamlit run src/dashboard/app.py
+  # Optional free deploy: https://streamlit.io/cloud
+
+# ---------------------------------------------------------------------------
+# Known free-stack limitations (document in papers / README)
+# ---------------------------------------------------------------------------
+limitations:
+  - Delisted S&P 500 members may lack price history in yfinance (survivorship bias).
+  - Point-in-time index data from Wikipedia sources may have gaps before ~2000.
+  - Analyst-consensus SUE requires paid data; this project uses lagged-EPS SUE instead.
+  - SimFin book equity is quarterly — align to announcement dates with care.

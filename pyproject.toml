@@ -25,6 +25,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+data = [
+    "yfinance>=0.2",
+    "datasets>=2.18",
+]
 llm = [
     "torch>=2.1",
     "transformers>=4.40",
